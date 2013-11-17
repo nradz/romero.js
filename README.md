@@ -1,4 +1,7 @@
-romero.js
-=========
+# romero.js
+
  
- *coming soon...*
+## why was that name chosen?
+
+- Because it is a friend's surname.
+- And I like it.
