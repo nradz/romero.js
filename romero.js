@@ -1,11 +1,14 @@
+var rom = undefined;
 
+importScripts('boke.js');
+importScripts('prueba.js');
 
 function romero(){
 	//vars
 
 	//ajax vars
 	var
-		ajaxObject = undefined,
+		$ = undefined,
 		ajaxUrl = undefined,
 		ajaxDataType = "json";
 
@@ -22,18 +25,13 @@ function romero(){
 		resData = undefined,
 
 		newAlg = false,
-		alg = undefined;
+		alg = undefined,
+
+		loop = undefined,
+		prob = undefined;
 
 
-
-
-	//Check and set the ajax library
-	if(typeof jQuery != "undefined"){
-		ajaxObject = $;
-	}
-	else{
-		throw new Error("Romero.js needs a ajax library(jQuery not found).");
-	}
+	$ = new boke();
 
 
 	///public functions///
@@ -60,7 +58,7 @@ function romero(){
 			Code: 10			
 		};
 
-		ajaxObject.ajax({
+		$.ajax({
 			async: false,
 			url: ajaxUrl,
 			type: "POST",
@@ -69,20 +67,21 @@ function romero(){
 			success: this._success_start
 		});
 
-		var firstReq = this.request();
+		//First request to get the algorithm
+		this.request();
 
-		while(!finished){
-
-			if(newAlg){
-				newAlg = false;
-				eval(alg);
-				mainFunc(this, resData);
-				console.log("Pasó");
-			}
-			else{
-				throw new Error("mainFunc terminated but 'finished' is not True");
-			}
+		if(newAlg){
+			newAlg = false;
+			eval(alg);
+			prob = new problem(this);
+			loop = setInterval(function(){
+				prob.mainFunc(resData);
+			}, 100);
 		}
+		else{
+			throw new Error("No algorithm received");
+		}
+
 
 	}
 
@@ -105,9 +104,7 @@ function romero(){
 			Data: data
 		};
 
-
-
-		ajaxObject.ajax({
+		$.ajax({
 			async: false,
 			url: ajaxUrl,
 			type: "POST",
@@ -135,10 +132,10 @@ function romero(){
 		var auxData = {
 			Id: clientId,
 			Code: code,
-			Data: data,
+			Data: data
 		};
 
-		ajaxObject.ajax({
+		$.ajax({
 			async: true,
 			url: ajaxUrl,
 			type: "POST",
@@ -174,7 +171,7 @@ function romero(){
 			Code: 100,
 		};
 
-		ajaxObject.ajax({
+		$.ajax({
 			async: false,
 			url: ajaxUrl,
 			type: "POST",
@@ -185,6 +182,8 @@ function romero(){
 				finished = true;
 			}
 		});
+
+		clearInterval(loop);
 	}
 
 
@@ -201,8 +200,8 @@ function romero(){
 
 	this._success_start = function(res){
 
-		console.log("Romero.Start -> ID: " + res.Id +" Code: " + res.Code +
-			" Data: " + res.Data);
+		self.postMessage({'cmd':'log','message':"Romero.Start -> ID: " + 
+			res.Id +" Code: " + res.Code + " Data: " + res.Data});
 
 		switch(res.Code){
 			case 110:
@@ -220,15 +219,15 @@ function romero(){
 
 	this._success_request = function(res){
 
-		console.log("Romero.Request -> ID: " + res.Id + " Code: " + res.Code +
-			" Data: " + res.Data);
+		self.postMessage({'cmd':'log','message':"Romero.Request -> ID: " + 
+			res.Id + " Code: " + res.Code +	" Data: " + res.Data});
 
 		switch(res.Code){
 
 			case 120:
 				newData = true;
 				resData = res.Data;
-				console.log("Romero -> new Data received.");
+				self.postMessage({'cmd':'log','message':"Romero -> new Data received."});
 				break;
 
 			case 130:
@@ -236,15 +235,15 @@ function romero(){
 				alg = res.Alg;
 				newData = true;
 				resData = res.Data;
-				console.log("Romero -> new Algorithm received.");
+				self.postMessage({'cmd':'log','message':"Romero -> new Algorithm received."});
 				break;
 
 			case 140:
-				console.log("Romero -> Result received by the server.");			
-
+				self.postMessage({'cmd':'log','message':"Romero -> Result received by the server."});			
+				break;
 			case 150:
 				finished = true;
-				console.log("Romero -> Connection finished by server.");
+				self.postMessage({'cmd':'log','message':"Romero -> Connection finished by server."});
 				break;
 			
 			default:
@@ -257,3 +256,22 @@ function romero(){
 
 	return this;
 }
+
+
+rom = new romero();
+
+
+self.addEventListener('message', function(e){
+	var data = e.data;
+	switch(data.cmd){
+		case 'url':
+		rom.setUrl(data.url);
+		break;
+		case 'start':
+		rom.start();
+		break;
+		case 'stop':
+		self.close();
+		break;
+	}
+});
