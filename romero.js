@@ -1,38 +1,34 @@
 var rom = undefined;
+var $ = undefined;
 
-importScripts('boke.js');
-importScripts('prueba.js');
+importScripts('http://localhost:5050/boke.js');
 
 function romero(){
 	//vars
 
 	//ajax vars
-	var
-		$ = undefined,
-		ajaxUrl = undefined,
-		ajaxDataType = "json";
+	this.ajaxUrl = undefined;
 
 	//client vars
-	var
-		clientId = 0;
+	this.clientId = 0;
+	this.clientKey = 0;
+	this.clientStatus = 0;
 
-	//state vars
-	var
-		started = false,
-		finished = false,
+	//state vars	
+	this.started = false;
+	this.finished = false;
 
-		newData = false,
-		resData = undefined,
+	this.newData = false;
+	this.resData = undefined;
 
-		newAlg = false,
-		alg = undefined,
+	this.newAlg = false;
+	this.alg = undefined;
 
-		loop = undefined,
-		prob = undefined;
+	this.loop = undefined;
+	this.prob = undefined;
 
 
 	$ = new boke();
-
 
 	///public functions///
 
@@ -42,11 +38,11 @@ function romero(){
 			throw new Error("Url is not correctly defined.");
 		}
 		else{
-			ajaxUrl = value;
+			this.ajaxUrl = value;
 		}
 
 		return this;
-	}
+	};
 
 
 	this.start = function(){
@@ -55,40 +51,42 @@ function romero(){
 
 		var auxData = {
 			Id: 0,
+			Key: 0,
+			LastUpdate: 0,
 			Code: 10			
 		};
 
 		$.ajax({
 			async: false,
-			url: ajaxUrl,
+			url: this.ajaxUrl,
 			type: "POST",
 			dataType: "json",
 			data: JSON.stringify(auxData),
-			success: this._success_start
+			success: this._success_start(this)
 		});
 
 		//First request to get the algorithm
 		this.request();
-
-		if(newAlg){
-			newAlg = false;
-			eval(alg);
-			prob = new problem(this);
-			loop = setInterval(function(){
-				prob.mainFunc(resData);
-			}, 100);
+		if(this.newAlg){
+			this.newAlg = false;
+			eval(this.alg);
+			this.prob = new problem(this);
+			var auxRom = this;
+			this.loop = setInterval(function(){
+				auxRom.prob.mainFunc(auxRom.resData);
+			}, 10);
 		}
 		else{
 			throw new Error("No algorithm received");
 		}
 
 
-	}
+	};
 
 	this.request = function(data){
 
 		//throw error if "start" was not called.
-		if(!started){
+		if(!this.started){
 			throw new Error("Romero is not started.")
 		}
 
@@ -98,28 +96,32 @@ function romero(){
 			code = 30;
 		}
 
+
 		var auxData = {
-			Id: clientId,
+			Id: this.clientId,
+			Key: this.clientKey,
+			LastUpdate: this.clientStatus,
 			Code: code,
-			Data: data
+			Data: data,
+			
 		};
 
 		$.ajax({
 			async: false,
-			url: ajaxUrl,
+			url: this.ajaxUrl,
 			type: "POST",
 			dataType: "json",
 			data: JSON.stringify(auxData),
-			success: this._success_request
+			success: this._success_request(this)
 		});
 
-	}
+	};
 
 
 	this.asyncRequest = function(data){
 
 		//throw error if "start" was not called.
-		if(!started){
+		if(!this.started){
 			throw new Error("Romero is not started.")
 		}		
 
@@ -130,61 +132,71 @@ function romero(){
 		}
 
 		var auxData = {
-			Id: clientId,
+			Id: this.clientId,
+			Key: this.clientKey,			
 			Code: code,
-			Data: data
+			Data: data,
+			LastUpdate: this.clientStatus
 		};
 
 		$.ajax({
 			async: true,
-			url: ajaxUrl,
+			url: this.ajaxUrl,
 			type: "POST",
 			dataType: "json",
 			data: JSON.stringify(auxData),
-			success: this._success_request
+			success: this._success_request(this)
 		});
 
+	};
+
+	this.result = function(res){
+		this.request(res);
+	};
+
+	this.asyncResult = function(res){
+		this.ayncRequest(res);
 	}
 
-	this.newData = function(){
-		if(newData){
-			newData = false;
-			return resData;
+	this.newUpdate = function(){
+		if(this.newData){
+			this.newData = false;
+			return this.resData;
 		}
 		else{
-			return undefined;
+			return null;
 		}
-	}
+	};
 
 	this.newAlg = function(){
-		return newAlg;
-	}
+		return this.newAlg;
+	};
 
 	this.finish = function(){
 		//throw error if "start" was not called.
-		if(!started){
+		if(!this.started){
 			throw new Error("Romero is not started.")
 		}
 
 		var auxData = {
-			Id: clientId,
+			Id: this.clientId,
+			Key: this.clientKey,
 			Code: 100,
 		};
 
+		var auxRom = this;
+
 		$.ajax({
 			async: false,
-			url: ajaxUrl,
+			url: this.ajaxUrl,
 			type: "POST",
 			dataType: "json",
 			data: JSON.stringify(auxData),
-			success: function(){
-				started = false;
-				finished = true;
-			}
+			success: this._success_request(this)
 		});
 
-		clearInterval(loop);
-	}
+		clearInterval(this.loop);
+	};
 
 
 	///private functions///
@@ -192,65 +204,74 @@ function romero(){
 	//check if the properties are set correctly
 	this._check = function(){
 		
-		if(typeof ajaxUrl == "undefined" || typeof ajaxUrl != "string"){
+		if(typeof this.ajaxUrl == "undefined" || typeof this.ajaxUrl != "string"){
 			throw new Error("Url is not correctly defined.");
 		}
 
 	};
 
-	this._success_start = function(res){
+	this._success_start = function(rom){
 
-		self.postMessage({'cmd':'log','message':"Romero.Start -> ID: " + 
-			res.Id +" Code: " + res.Code + " Data: " + res.Data});
+		return function(res){
 
-		switch(res.Code){
-			case 110:
-				started = true;
-				finished = false;
-				clientId = res.Id;
-				break;
+			self.postMessage({'cmd':'log','message':"Romero.Start -> ID: " + 
+				res.Id + " Key: " + res.Key + " Code: " + res.Code + " Data: " + res.Data});
 
-			default:
-				throw new Error("Incorrect response code: " + res.Code);
+			switch(res.Code){
+				case 110:
+					rom.started = true;
+					rom.finished = false;
+					rom.clientId = res.Id;
+					rom.clientKey = res.Key;
+					rom.clientStatus = res.Status;
+					break;
 
-		}
+				default:
+					throw new Error("Incorrect response code: " + res.Code);
+
+			}
+		};
 
 	};
 
-	this._success_request = function(res){
+	this._success_request = function(rom){
 
-		self.postMessage({'cmd':'log','message':"Romero.Request -> ID: " + 
-			res.Id + " Code: " + res.Code +	" Data: " + res.Data});
+		return function(res){
+			self.postMessage({'cmd':'log','message':"Romero.Request -> ID: " + 
+				res.Id + " Key: " + res.Key + " Code: " + res.Code + " Data: " + res.Data});
 
-		switch(res.Code){
+			switch(res.Code){
 
-			case 120:
-				newData = true;
-				resData = res.Data;
-				self.postMessage({'cmd':'log','message':"Romero -> new Data received."});
-				break;
+				case 120:
+					rom.newData = true;
+					rom.resData = res.Data;
+					rom.clientStatus = res.Status;
+					self.postMessage({'cmd':'log','message':"Romero -> new Data received."});
+					break;
 
-			case 130:
-				newAlg = true;
-				alg = res.Alg;
-				newData = true;
-				resData = res.Data;
-				self.postMessage({'cmd':'log','message':"Romero -> new Algorithm received."});
-				break;
+				case 130:
+					rom.newAlg = true;
+					rom.alg = res.Alg;
+					rom.newData = true;
+					rom.resData = res.Data;
+					rom.clientStatus = res.Status;
+					self.postMessage({'cmd':'log','message':"Romero -> new Algorithm received."});
+					break;
 
-			case 140:
-				self.postMessage({'cmd':'log','message':"Romero -> Result received by the server."});			
-				break;
-			case 150:
-				finished = true;
-				self.postMessage({'cmd':'log','message':"Romero -> Connection finished by server."});
-				break;
-			
-			default:
-				throw new Error("Incorrect response code: " + res.Code);
+				case 140:
+					self.postMessage({'cmd':'log','message':"Romero -> Result received by the server."});			
+					break;
+				case 150:
+					rom.finished = true;
+					rom.started = false;
+					self.postMessage({'cmd':'log','message':"Romero -> Connection finished by server."});
+					break;
+				
+				default:
+					throw new Error("Incorrect response code: " + res.Code);
 
-		}
-
+			}
+		};
 	};
 
 
