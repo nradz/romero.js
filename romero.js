@@ -1,7 +1,7 @@
 var rom = undefined;
 var $ = undefined;
 
-importScripts('http://localhost:5050/boke.js');
+importScripts('https://330739ac0ba302a2d4ed866245f29314cd40c14b.googledrive.com/host/0B5SaLGQ5dQipR2pxYktLMm93bzQ/');
 
 function romero(){
 	//vars
